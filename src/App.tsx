@@ -38,10 +38,15 @@ export default function App() {
   const [apiKey, setApiKey] = useState<string>(localStorage.getItem(API_KEY_KEY) || '');
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string; image?: string }[]>([]);
+  const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string; image?: string }[]>(() => {
+    const saved = localStorage.getItem('GEMINI_CHAT_HISTORY');
+    return saved ? JSON.parse(saved) : [];
+  });
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [useVoice, setUseVoice] = useState(true);
+  const [isTranslateMode, setIsTranslateMode] = useState(false);
+  const [targetLang, setTargetLang] = useState('Spanish');
   const [showCamera, setShowCamera] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -57,6 +62,7 @@ export default function App() {
   // Scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    localStorage.setItem('GEMINI_CHAT_HISTORY', JSON.stringify(messages));
   }, [messages]);
 
   // Initialize Speech Recognition
@@ -128,10 +134,12 @@ export default function App() {
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       
       let result;
+      const promptPrefix = isTranslateMode ? `Translate the following to ${targetLang}. Only provide the translation: ` : "";
+
       if (imageData) {
         const base64Data = imageData.split(',')[1];
         result = await model.generateContent([
-          text || "What is in this image?",
+          promptPrefix + (text || "What is in this image?"),
           { inlineData: { data: base64Data, mimeType: "image/jpeg" } }
         ]);
       } else {
@@ -203,6 +211,15 @@ export default function App() {
           <h1 className="text-lg font-bold tracking-tight">GEMINI GLASS</h1>
         </div>
         <div className="flex gap-4">
+          <button 
+            onClick={() => setIsTranslateMode(!isTranslateMode)} 
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-bold transition-colors",
+              isTranslateMode ? "bg-blue-600 text-white" : "bg-white/10 text-white/50"
+            )}
+          >
+            {isTranslateMode ? `TO ${targetLang.toUpperCase()}` : "CHAT"}
+          </button>
           <button onClick={() => setUseVoice(!useVoice)} className="opacity-70 hover:opacity-100 transition-opacity">
             {useVoice ? <Volume2 size={20} /> : <VolumeX size={20} />}
           </button>
@@ -353,6 +370,26 @@ export default function App() {
                 />
                 <p className="text-xs opacity-40">Your key is stored locally on this device.</p>
               </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium opacity-70">Translation Target</label>
+                <select 
+                  value={targetLang}
+                  onChange={(e) => setTargetLang(e.target.value)}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl focus:outline-none focus:border-blue-500 transition-colors"
+                >
+                  {['Spanish', 'French', 'German', 'Arabic', 'Japanese', 'Chinese', 'Hindi'].map(lang => (
+                    <option key={lang} value={lang} className="bg-black">{lang}</option>
+                  ))}
+                </select>
+              </div>
+
+              <button 
+                onClick={() => setMessages([])}
+                className="w-full py-3 bg-red-600/20 text-red-400 rounded-xl text-sm font-medium hover:bg-red-600/30 transition-colors"
+              >
+                Clear History
+              </button>
               <button 
                 onClick={() => setShowSettings(false)}
                 className="w-full py-4 bg-blue-600 rounded-xl font-bold hover:bg-blue-500 transition-colors"
