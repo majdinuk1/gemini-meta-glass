@@ -49,6 +49,7 @@ export default function App() {
   const [targetLang, setTargetLang] = useState('Spanish');
   const [showCamera, setShowCamera] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [inputText, setInputText] = useState('');
   const [status, setStatus] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
 
@@ -58,6 +59,20 @@ export default function App() {
   const synthRef = useRef<SpeechSynthesis>(window.speechSynthesis);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleKeyboardKey = (key: string) => {
+    if (key === 'BACK') {
+      setInputText(prev => prev.slice(0, -1));
+    } else if (key === 'SPACE') {
+      setInputText(prev => prev + ' ');
+    } else if (key === 'DONE') {
+      if (inputText.trim()) handleSendMessage(inputText);
+      setInputText('');
+      setShowKeyboard(false);
+    } else {
+      setInputText(prev => prev + key);
+    }
+  };
 
   // Clear status after 5s
   useEffect(() => {
@@ -79,15 +94,10 @@ export default function App() {
   // Meta Neural Band / Keyboard Listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // If typing in input, don't trigger gestures except Enter
-      if (document.activeElement?.tagName === 'INPUT' && e.key !== 'Enter') return;
-
       switch(e.key) {
         case 'Enter':
-          if (document.activeElement?.tagName === 'INPUT') {
-            handleSendMessage(inputText);
-            setInputText('');
-            inputRef.current?.blur();
+          if (showKeyboard) {
+            handleKeyboardKey('DONE');
           } else if (showCamera) {
             captureImage();
           } else {
@@ -95,8 +105,9 @@ export default function App() {
           }
           break;
         case 'Escape':
-          if (showSettings) setShowSettings(false);
-          else if (showCamera) setShowCamera(false);
+          if (showKeyboard) setShowKeyboard(false);
+          else if (showSettings) setShowSettings(false);
+          else if (showCamera) stopCamera();
           else setShowSettings(true);
           break;
         case 'ArrowDown':
@@ -110,7 +121,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCamera, showSettings, isTranslateMode, inputText]);
+  }, [showCamera, showSettings, isTranslateMode, showKeyboard, inputText]);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -387,20 +398,12 @@ export default function App() {
         <div className="flex flex-col gap-4">
           {/* Text Input for Full Keyboard */}
           <div className="flex gap-2">
-            <input
-              ref={inputRef}
-              type="text"
-              enterKeyHint="send"
-              inputMode="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onFocus={() => {
-                // Force scroll to top or specific behavior if needed for glasses keyboard
-                window.scrollTo(0, 0);
-              }}
-              placeholder="Type or use voice..."
-              className="flex-1 bg-white/15 border border-white/30 rounded-2xl px-4 py-3 focus:outline-none focus:border-blue-500 text-lg text-white placeholder-white/40"
-            />
+            <button
+              onClick={() => setShowKeyboard(!showKeyboard)}
+              className="flex-1 bg-white/15 border border-white/30 rounded-2xl px-4 py-3 text-left text-lg text-white/40 overflow-hidden whitespace-nowrap min-h-[52px]"
+            >
+              {inputText || "Tap to type..."}
+            </button>
             {inputText.trim() && (
               <button 
                 onClick={() => {
@@ -417,7 +420,7 @@ export default function App() {
           <div className="flex justify-center items-center gap-12">
             <button 
               onClick={startCamera}
-              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors focus:bg-blue-600 outline-none"
             >
               <Camera size={28} />
             </button>
@@ -425,22 +428,47 @@ export default function App() {
             <button 
               onClick={toggleListening}
               className={cn(
-                "p-8 rounded-full transition-all duration-300 scale-110 shadow-2xl shadow-blue-500/20",
-                isListening ? "bg-red-500 scale-125 animate-pulse" : "bg-blue-600 hover:bg-blue-500"
+                "p-8 rounded-full transition-all duration-300 scale-110 shadow-2xl shadow-blue-500/20 focus:scale-125 outline-none",
+                isListening ? "bg-red-500 scale-125 animate-pulse" : "bg-blue-600 hover:bg-blue-500 focus:bg-blue-500"
               )}
             >
               {isListening ? <MicOff size={40} /> : <Mic size={40} />}
             </button>
 
             <button 
-              onClick={() => inputRef.current?.focus()}
-              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+              onClick={() => setShowKeyboard(true)}
+              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors focus:bg-blue-600 outline-none"
             >
               <User size={28} />
             </button>
           </div>
         </div>
       </footer>
+
+      {/* On-Screen Keyboard */}
+      <AnimatePresence>
+        {showKeyboard && (
+          <motion.div 
+            initial={{ y: 300 }} 
+            animate={{ y: 0 }} 
+            exit={{ y: 300 }}
+            className="fixed bottom-0 left-0 right-0 bg-zinc-950 p-2 grid grid-cols-10 gap-1 z-[100] border-t border-white/10 shadow-2xl"
+          >
+            {['Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','-','Z','X','C','V','B','N','M',',','.','?'].map(k => (
+              <button 
+                key={k} 
+                onClick={() => handleKeyboardKey(k)} 
+                className="p-3 bg-white/5 rounded text-sm active:bg-blue-600 focus:bg-blue-600 outline-none border border-white/5"
+              >
+                {k}
+              </button>
+            ))}
+            <button onClick={() => handleKeyboardKey('BACK')} className="col-span-2 p-3 bg-red-900/40 rounded text-xs font-bold border border-red-500/20">DEL</button>
+            <button onClick={() => handleKeyboardKey('SPACE')} className="col-span-6 p-3 bg-white/10 rounded uppercase text-xs tracking-widest border border-white/10">Space</button>
+            <button onClick={() => handleKeyboardKey('DONE')} className="col-span-2 p-3 bg-blue-600 rounded text-xs font-bold shadow-lg shadow-blue-500/20">SEND</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Camera Overlay */}
       <AnimatePresence>
