@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-black text-white font-sans;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glasses-specific optimizations */
+.glass-ui {
+  @apply fixed inset-0 flex flex-col items-center justify-center p-4 text-center;
+}
+
+.large-text {
+  @apply text-2xl font-bold mb-4 leading-tight;
+}
+
+.status-dot {
+  @apply w-4 h-4 rounded-full;
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
