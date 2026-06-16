@@ -49,12 +49,23 @@ export default function App() {
   const [targetLang, setTargetLang] = useState('Spanish');
   const [showCamera, setShowCamera] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [inputText, setInputText] = useState('');
+  const [status, setStatus] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const synthRef = useRef<SpeechSynthesis>(window.speechSynthesis);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Clear status after 5s
+  useEffect(() => {
+    if (status) {
+      const timer = setTimeout(() => setStatus(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [status]);
 
   // Initialize Gemini
   const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
@@ -65,31 +76,33 @@ export default function App() {
     localStorage.setItem('GEMINI_CHAT_HISTORY', JSON.stringify(messages));
   }, [messages]);
 
-  // Initialize Speech Recognition
+  // Meta Neural Band / Keyboard Listeners
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Meta Neural Band Gesture Mappings
+      // If typing in input, don't trigger gestures except Enter
+      if (document.activeElement?.tagName === 'INPUT' && e.key !== 'Enter') return;
+
       switch(e.key) {
-        case 'Enter': // Index Pinch
-          if (showCamera) {
+        case 'Enter':
+          if (document.activeElement?.tagName === 'INPUT') {
+            handleSendMessage(inputText);
+            setInputText('');
+            inputRef.current?.blur();
+          } else if (showCamera) {
             captureImage();
           } else {
             toggleListening();
           }
           break;
-        case 'Escape': // Middle Pinch
-          if (showSettings) {
-            setShowSettings(false);
-          } else if (showCamera) {
-            setShowCamera(false);
-          } else {
-            setShowSettings(true);
-          }
+        case 'Escape':
+          if (showSettings) setShowSettings(false);
+          else if (showCamera) setShowCamera(false);
+          else setShowSettings(true);
           break;
-        case 'ArrowDown': // Swipe Down
+        case 'ArrowDown':
           if (!showCamera) startCamera();
           break;
-        case 'ArrowUp': // Swipe Up
+        case 'ArrowUp':
           setIsTranslateMode(prev => !prev);
           break;
       }
@@ -97,7 +110,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showCamera, showSettings, isTranslateMode]);
+  }, [showCamera, showSettings, isTranslateMode, inputText]);
 
   // Initialize Speech Recognition
   useEffect(() => {
@@ -115,16 +128,36 @@ export default function App() {
 
       recognition.onerror = (event: any) => {
         console.error('Speech recognition error', event.error);
+        setStatus({ type: 'error', message: `Mic Error: ${event.error}` });
         setIsListening(false);
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        // If we have a transcript, send it automatically when voice ends
+        setTranscript(current => {
+          if (current.trim()) {
+            handleSendMessage(current);
+          }
+          return '';
+        });
       };
 
       recognitionRef.current = recognition;
+    } else {
+      setStatus({ type: 'error', message: "Speech recognition not supported in this browser." });
     }
   }, []);
+
+  const requestPermissions = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+      stream.getTracks().forEach(t => t.stop());
+      setStatus({ type: 'info', message: "Permissions granted!" });
+    } catch (err) {
+      setStatus({ type: 'error', message: "Permission denied or blocked." });
+    }
+  };
 
   const speak = useCallback((text: string) => {
     if (!useVoice || !synthRef.current) return;
@@ -262,8 +295,25 @@ export default function App() {
         </div>
       </header>
 
+      {/* Status Bar */}
+      <AnimatePresence>
+        {status && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={cn(
+              "fixed top-20 left-4 right-4 p-3 rounded-xl text-sm font-bold text-center z-50",
+              status.type === 'error' ? "bg-red-500/90" : "bg-green-500/90"
+            )}
+          >
+            {status.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Main Chat Area */}
-      <main className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide">
+      <main className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide pb-32">
         {messages.length === 0 && (
           <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
             <Bot size={64} className="text-blue-500" />
@@ -306,7 +356,7 @@ export default function App() {
       </main>
 
       {/* Bottom Controls */}
-      <footer className="p-6 bg-gradient-to-t from-black via-black to-transparent space-y-4">
+      <footer className="p-4 bg-gradient-to-t from-black via-black to-transparent space-y-4">
         {transcript && (
           <motion.div 
             initial={{ opacity: 0, y: 10 }} 
@@ -317,33 +367,55 @@ export default function App() {
           </motion.div>
         )}
 
-        <div className="flex justify-center items-center gap-8">
-          <button 
-            onClick={startCamera}
-            className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-          >
-            <Camera size={28} />
-          </button>
-
-          <button 
-            onClick={toggleListening}
-            className={cn(
-              "p-8 rounded-full transition-all duration-300 scale-110 shadow-2xl shadow-blue-500/20",
-              isListening ? "bg-red-500 scale-125 animate-pulse" : "bg-blue-600 hover:bg-blue-500"
+        <div className="flex flex-col gap-4">
+          {/* Text Input for Full Keyboard */}
+          <div className="flex gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder="Type or use voice..."
+              className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 focus:outline-none focus:border-blue-500 text-lg"
+            />
+            {inputText.trim() && (
+              <button 
+                onClick={() => {
+                  handleSendMessage(inputText);
+                  setInputText('');
+                }}
+                className="p-3 bg-blue-600 rounded-2xl"
+              >
+                <Send size={24} />
+              </button>
             )}
-          >
-            {isListening ? <MicOff size={40} /> : <Mic size={40} />}
-          </button>
+          </div>
 
-          <button 
-            onClick={() => {
-              const text = prompt("Type your message:");
-              if (text) handleSendMessage(text);
-            }}
-            className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
-          >
-            <Send size={28} />
-          </button>
+          <div className="flex justify-center items-center gap-12">
+            <button 
+              onClick={startCamera}
+              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+            >
+              <Camera size={28} />
+            </button>
+
+            <button 
+              onClick={toggleListening}
+              className={cn(
+                "p-8 rounded-full transition-all duration-300 scale-110 shadow-2xl shadow-blue-500/20",
+                isListening ? "bg-red-500 scale-125 animate-pulse" : "bg-blue-600 hover:bg-blue-500"
+              )}
+            >
+              {isListening ? <MicOff size={40} /> : <Mic size={40} />}
+            </button>
+
+            <button 
+              onClick={() => inputRef.current?.focus()}
+              className="p-4 rounded-full bg-white/5 border border-white/10 hover:bg-white/10 transition-colors"
+            >
+              <User size={28} />
+            </button>
+          </div>
         </div>
       </footer>
 
@@ -424,6 +496,16 @@ export default function App() {
                     <p className="font-medium">Translate Mode</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <button 
+                  onClick={requestPermissions}
+                  className="w-full py-4 bg-white/10 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-white/20 transition-colors"
+                >
+                  <RefreshCw size={20} /> Request Mic & Camera
+                </button>
+                <p className="text-[10px] opacity-40 text-center uppercase tracking-widest">Crucial for Voice & Look and Tell</p>
               </div>
 
               <div className="space-y-2">
