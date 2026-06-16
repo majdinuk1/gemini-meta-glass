@@ -33,9 +33,10 @@ declare global {
 }
 
 const API_KEY_KEY = 'GEMINI_API_KEY';
+const DEFAULT_API_KEY = 'AIzaSyCcKAT53P6Tqb_Il6KqUv0WgE-5-uLjIro';
 
 export default function App() {
-  const [apiKey, setApiKey] = useState<string>(localStorage.getItem(API_KEY_KEY) || '');
+  const [apiKey, setApiKey] = useState<string>(localStorage.getItem(API_KEY_KEY) || DEFAULT_API_KEY);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string; image?: string }[]>(() => {
