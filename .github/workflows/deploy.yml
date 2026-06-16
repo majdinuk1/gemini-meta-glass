@@ -18,10 +18,9 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-          cache-dependency-path: gemini-meta-glass/package-lock.json
+          cache-dependency-path: package-lock.json
       - name: Install and Build
         run: |
-          cd gemini-meta-glass
           npm install
           npm run build
       - name: Setup Pages
@@ -29,7 +28,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './gemini-meta-glass/dist'
+          path: './dist'
 
   deploy:
     needs: build
