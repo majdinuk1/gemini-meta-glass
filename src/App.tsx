@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { GoogleGenerativeAI, Content } from '@google/generative-ai';
-import { Mic, MicOff, Camera, RefreshCw, Send, Settings, User, Bot, Volume2, VolumeX } from 'lucide-react';
+import { Mic, MicOff, Camera, RefreshCw, Send, Settings, Bot, Volume2, VolumeX } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -44,7 +44,6 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
   const [isLoading, setIsLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
   const [useVoice, setUseVoice] = useState(true);
   const [isTranslateMode, setIsTranslateMode] = useState(false);
   const [targetLang, setTargetLang] = useState('Spanish');
@@ -100,9 +99,8 @@ export default function App() {
     synthRef.current.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.onstart = () => setIsSpeaking(true);
+    utterance.onstart = () => {};
     utterance.onend = () => {
-      setIsSpeaking(false);
       // Auto-listen after speaking if desired? 
       // Maybe not automatically to avoid loops, but user can trigger.
     };
