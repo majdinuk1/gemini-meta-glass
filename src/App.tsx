@@ -238,28 +238,45 @@ export default function App() {
         canvasRef.current.height = videoRef.current.videoHeight;
         context.drawImage(videoRef.current, 0, 0);
         const imageData = canvasRef.current.toDataURL('image/jpeg');
-        setShowCamera(false);
+        stopCamera();
         // Ask Gemini about the image
         handleSendMessage("Tell me what you see here.", imageData);
-        
-        // Stop camera streams
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream?.getTracks().forEach(track => track.stop());
       }
     }
   };
 
   const startCamera = async () => {
     setShowCamera(true);
+    setStatus({ type: 'info', message: "Opening camera..." });
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: 'environment',
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        } 
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // Wait for metadata to load before playing to prevent "flash"
+        videoRef.current.onloadedmetadata = () => {
+          videoRef.current?.play();
+        };
       }
     } catch (err) {
       console.error("Camera access error:", err);
+      setStatus({ type: 'error', message: "Camera failed. Check permissions in Meta AI app." });
       setShowCamera(false);
     }
+  };
+
+  const stopCamera = () => {
+    if (videoRef.current && videoRef.current.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setShowCamera(false);
   };
 
   const saveApiKey = (key: string) => {
@@ -373,10 +390,16 @@ export default function App() {
             <input
               ref={inputRef}
               type="text"
+              enterKeyHint="send"
+              inputMode="text"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
+              onFocus={() => {
+                // Force scroll to top or specific behavior if needed for glasses keyboard
+                window.scrollTo(0, 0);
+              }}
               placeholder="Type or use voice..."
-              className="flex-1 bg-white/10 border border-white/20 rounded-2xl px-4 py-3 focus:outline-none focus:border-blue-500 text-lg"
+              className="flex-1 bg-white/15 border border-white/30 rounded-2xl px-4 py-3 focus:outline-none focus:border-blue-500 text-lg text-white placeholder-white/40"
             />
             {inputText.trim() && (
               <button 
@@ -432,11 +455,7 @@ export default function App() {
             <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none" />
             <div className="absolute bottom-12 flex gap-8">
               <button 
-                onClick={() => {
-                  setShowCamera(false);
-                  const stream = videoRef.current?.srcObject as MediaStream;
-                  stream?.getTracks().forEach(track => track.stop());
-                }}
+                onClick={stopCamera}
                 className="px-6 py-3 bg-white/10 rounded-full font-bold"
               >
                 Cancel
