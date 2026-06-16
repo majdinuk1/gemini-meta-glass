@@ -67,6 +67,40 @@ export default function App() {
 
   // Initialize Speech Recognition
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Meta Neural Band Gesture Mappings
+      switch(e.key) {
+        case 'Enter': // Index Pinch
+          if (showCamera) {
+            captureImage();
+          } else {
+            toggleListening();
+          }
+          break;
+        case 'Escape': // Middle Pinch
+          if (showSettings) {
+            setShowSettings(false);
+          } else if (showCamera) {
+            setShowCamera(false);
+          } else {
+            setShowSettings(true);
+          }
+          break;
+        case 'ArrowDown': // Swipe Down
+          if (!showCamera) startCamera();
+          break;
+        case 'ArrowUp': // Swipe Up
+          setIsTranslateMode(prev => !prev);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showCamera, showSettings, isTranslateMode]);
+
+  // Initialize Speech Recognition
+  useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -368,6 +402,28 @@ export default function App() {
                   onBlur={(e) => saveApiKey(e.target.value)}
                 />
                 <p className="text-xs opacity-40">Your key is stored locally on this device.</p>
+              </div>
+
+              <div className="space-y-4 p-4 bg-white/5 rounded-2xl border border-white/5">
+                <h3 className="text-sm font-bold text-blue-400 uppercase tracking-widest">Neural Band Gestures</h3>
+                <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="space-y-1">
+                    <p className="opacity-50 uppercase">Index Pinch</p>
+                    <p className="font-medium">Listen / Capture</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="opacity-50 uppercase">Middle Pinch</p>
+                    <p className="font-medium">Settings / Back</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="opacity-50 uppercase">Swipe Down</p>
+                    <p className="font-medium">Open Camera</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="opacity-50 uppercase">Swipe Up</p>
+                    <p className="font-medium">Translate Mode</p>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-2">
