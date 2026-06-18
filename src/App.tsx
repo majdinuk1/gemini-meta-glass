@@ -30,6 +30,15 @@ function GeminiApp({ onBack }: { onBack: () => void }) {
   const [inputText, setInputText] = useState('');
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [status, setStatus] = useState<{ type: 'error' | 'info'; message: string } | null>(null);
+  const [hardwareCompatibility, setHardwareCompatibility] = useState({ mic: true, cam: true });
+
+  useEffect(() => {
+    const checkHardware = async () => {
+      const mic = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      setHardwareCompatibility({ mic, cam: mic }); // Usually both or none on these glasses
+    };
+    checkHardware();
+  }, []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -321,14 +330,45 @@ function GeminiApp({ onBack }: { onBack: () => void }) {
       </AnimatePresence>
 
       {showSettings && (
-        <div className="absolute inset-0 z-50 bg-black/90 flex flex-col p-6 space-y-6 justify-center">
-          <h2 className="text-2xl font-bold">Settings</h2>
-          <button onClick={requestPermissions} className="py-4 bg-white/10 rounded-xl font-bold flex items-center justify-center gap-2"><RefreshCw size={20} /> Request Mic & Camera</button>
-          <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="p-4 bg-white/5 rounded-xl border border-white/10">
-            {['Spanish', 'French', 'German', 'Arabic', 'Japanese', 'Chinese', 'Hindi'].map(lang => <option key={lang} value={lang} className="bg-black">{lang}</option>)}
-          </select>
-          <button onClick={() => setMessages([])} className="py-4 bg-red-600/20 text-red-400 rounded-xl">Clear History</button>
-          <button onClick={() => setShowSettings(false)} className="py-4 bg-blue-600 rounded-xl font-bold">Done</button>
+        <div className="absolute inset-0 z-50 bg-black/95 flex flex-col p-6 space-y-4 justify-start overflow-y-auto">
+          <h2 className="text-2xl font-bold border-b border-white/10 pb-2">Hardware Status</h2>
+          
+          <div className="space-y-2 py-2">
+            <div className="flex justify-between items-center text-xs">
+              <span className="opacity-50">Microphone:</span>
+              <span className={hardwareCompatibility.mic ? "text-green-500" : "text-red-500"}>
+                {hardwareCompatibility.mic ? "SUPPORTED" : "RESTRICTED BY OS"}
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-xs">
+              <span className="opacity-50">Camera:</span>
+              <span className={hardwareCompatibility.cam ? "text-green-500" : "text-red-500"}>
+                {hardwareCompatibility.cam ? "SUPPORTED" : "RESTRICTED BY OS"}
+              </span>
+            </div>
+          </div>
+
+          {!hardwareCompatibility.mic && (
+            <div className="bg-blue-900/20 border border-blue-500/30 p-3 rounded-xl text-[10px] leading-relaxed">
+              <p className="font-bold mb-1 underline">HOW TO ENABLE PERMISSIONS:</p>
+              1. Open **Meta View App** on phone.<br/>
+              2. Go to **Settings > Early Access**.<br/>
+              3. Ensure **Developer Mode** is ON.<br/>
+              4. Open this URL in **Chrome** on phone first and click "Allow".
+            </div>
+          )}
+
+          <button onClick={requestPermissions} className="py-3 bg-white/10 rounded-xl font-bold flex items-center justify-center gap-2 text-sm"><RefreshCw size={16} /> Force Prompt</button>
+          
+          <div className="space-y-1">
+            <label className="text-[10px] opacity-50 uppercase font-bold">Target Language</label>
+            <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)} className="w-full p-3 bg-white/5 rounded-xl border border-white/10 text-sm">
+              {['Spanish', 'French', 'German', 'Arabic', 'Japanese', 'Chinese', 'Hindi'].map(lang => <option key={lang} value={lang} className="bg-black">{lang}</option>)}
+            </select>
+          </div>
+
+          <button onClick={() => setMessages([])} className="py-3 bg-red-600/20 text-red-400 rounded-xl text-sm font-bold">Clear Chat</button>
+          <button onClick={() => setShowSettings(false)} className="py-4 bg-blue-600 rounded-xl font-bold shadow-lg">Back to App</button>
         </div>
       )}
       <canvas ref={canvasRef} className="hidden" />
@@ -342,16 +382,27 @@ function OBDApp({ onBack }: { onBack: () => void }) {
   const [rpm, setRpm] = useState<number>(0);
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState("Disconnected");
+  const [isSupported, setIsSupported] = useState(true);
+
+  useEffect(() => {
+    if (!('bluetooth' in navigator)) {
+      setIsSupported(false);
+      setStatus("Bluetooth Not Supported by Browser");
+    }
+  }, []);
 
   const connectOBD = async () => {
+    if (!isSupported) return;
     try {
       setStatus("Requesting Bluetooth...");
-      const device = await (navigator as any).bluetooth.requestDevice({
+      const navBT = (navigator as any).bluetooth;
+      if (!navBT) throw new Error("Bluetooth API not found");
+
+      const device = await navBT.requestDevice({
         acceptAllDevices: true,
-        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Common OBD serial
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb']
       });
       setStatus(`Connecting to ${device.name}...`);
-      // Mocking successful connection for Web App Sandbox
       setTimeout(() => {
         setConnected(true);
         setStatus("Connected to ELM327");
