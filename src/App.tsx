@@ -14,7 +14,7 @@ const API_KEY_KEY = 'GEMINI_API_KEY';
 const DEFAULT_API_KEY = 'AIzaSyCcKAT53P6Tqb_Il6KqUv0WgE-5-uLjIro';
 
 function GeminiApp({ onBack }: { onBack: () => void }) {
-  const [apiKey, setApiKey] = useState<string>(localStorage.getItem(API_KEY_KEY) || DEFAULT_API_KEY);
+  const [apiKey] = useState<string>(localStorage.getItem(API_KEY_KEY) || DEFAULT_API_KEY);
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string; image?: string }[]>(() => {
@@ -242,11 +242,22 @@ function GeminiApp({ onBack }: { onBack: () => void }) {
         </div>
       </header>
 
-      {status && (
-        <div className={cn("absolute top-20 left-4 right-4 p-3 rounded-xl text-sm font-bold text-center z-50", status.type === 'error' ? "bg-red-500/90" : "bg-green-500/90")}>
-          {status.message}
-        </div>
-      )}
+      {/* Status Bar */}
+      <AnimatePresence>
+        {status && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className={cn(
+              "absolute top-20 left-4 right-4 p-3 rounded-xl text-sm font-bold text-center z-50",
+              status.type === 'error' ? "bg-red-500/90" : "bg-green-500/90"
+            )}
+          >
+            {status.message}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="flex-1 overflow-y-auto p-4 space-y-6 scrollbar-hide pb-32">
         {messages.length === 0 && (
@@ -288,16 +299,26 @@ function GeminiApp({ onBack }: { onBack: () => void }) {
         </div>
       </footer>
 
-      {showKeyboard && (
-        <div className="absolute bottom-0 left-0 right-0 bg-zinc-950 p-2 grid grid-cols-10 gap-1 z-[100] border-t border-white/10 shadow-2xl">
-          {['Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','-','Z','X','C','V','B','N','M',',','.','?'].map(k => (
-            <button key={k} onClick={() => handleKeyboardKey(k)} className="p-3 bg-white/5 rounded text-sm active:bg-blue-600">{k}</button>
-          ))}
-          <button onClick={() => handleKeyboardKey('BACK')} className="col-span-2 p-3 bg-red-900/40 rounded text-xs font-bold border border-red-500/20">DEL</button>
-          <button onClick={() => handleKeyboardKey('SPACE')} className="col-span-6 p-3 bg-white/10 rounded uppercase text-xs tracking-widest border border-white/10">Space</button>
-          <button onClick={() => handleKeyboardKey('DONE')} className="col-span-2 p-3 bg-blue-600 rounded text-xs font-bold shadow-lg shadow-blue-500/20">SEND</button>
-        </div>
-      )}
+      {/* On-Screen Keyboard */}
+      <AnimatePresence>
+        {showKeyboard && (
+          <motion.div 
+            initial={{ y: 300 }} 
+            animate={{ y: 0 }} 
+            exit={{ y: 300 }}
+            className="absolute bottom-0 left-0 right-0 bg-zinc-950 p-2 grid grid-cols-10 gap-1 z-[100] border-t border-white/10 shadow-2xl"
+          >
+            {['Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','-','Z','X','C','V','B','N','M',',','.','?'].map(k => (
+              <button key={k} onClick={() => handleKeyboardKey(k)} className="p-3 bg-white/5 rounded text-sm active:bg-blue-600 focus:bg-blue-600 outline-none border border-white/5">
+                {k}
+              </button>
+            ))}
+            <button onClick={() => handleKeyboardKey('BACK')} className="col-span-2 p-3 bg-red-900/40 rounded text-xs font-bold border border-red-500/20">DEL</button>
+            <button onClick={() => handleKeyboardKey('SPACE')} className="col-span-6 p-3 bg-white/10 rounded uppercase text-xs tracking-widest border border-white/10">Space</button>
+            <button onClick={() => handleKeyboardKey('DONE')} className="col-span-2 p-3 bg-blue-600 rounded text-xs font-bold shadow-lg shadow-blue-500/20">SEND</button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {showSettings && (
         <div className="absolute inset-0 z-50 bg-black/90 flex flex-col p-6 space-y-6 justify-center">
